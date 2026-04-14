@@ -1,32 +1,43 @@
-import { useEffect, useRef, useState } from "react";
-import { BREAK_TIME, direction, KEY, keyCode, mapKey, MAX_TARGET_DISTANCE, MOVEMENT_KEYS, SOLID_OBJECTS } from "./util";
+import { use, useEffect, useRef } from "react";
+import { BREAK_TIME, direction, KEY, keyCode, mapKey, MAX_TARGET_DISTANCE, MOVEMENT_KEYS, SOLID_OBJECTS, TILE_SIZE, TileName, getTileDrops, getPlacementResult } from "./util";
+import Grass from "./tiles/Grass";
+import Stone from "./tiles/Stone";
+import Sand from "./tiles/Sand";
+import { tileFactory } from "./tiles/Tile";
 
-const MOVE_INTERVAL = 20;
+const MOVE_INTERVAL = 50;
 const MOVE_AMOUNT = 0.1;
+// const MOVE_AMOUNT = 1;
 
 const Player = ({
   onPlayerUpdate,
-  onMapUpdate,
+  onTileUpdate,
+  onItemDrop,
+  onItemPickup,
+  onSelectItem,
   map,
   position,
   momentum,
   facing,
   inventory,
   targetDistance,
-  selected
+  selected,
+  droppedItems,
+  waterEngine
 }) => {
   const heldKeys = useRef(new Set());
-  const mapRef = useRef(map);
   const positionRef = useRef(position);
   const momentumRef = useRef(momentum);
+  const selectedRef = useRef(selected);
+  const inventoryRef = useRef(inventory);
+  const droppedItemsRef = useRef(droppedItems);
   const movementInterval = useRef(null);
   const breakTimeout = useRef(null);
-  const selectedRef = useRef(selected)
 
-  useEffect(() => { mapRef.current = map; }, [map]);
   useEffect(() => { positionRef.current = position; }, [position]);
   useEffect(() => { momentumRef.current = momentum; }, [momentum]);
-  // useEffect(() => { selectedRef.current = selected; }, [selected]);
+  useEffect(() => { inventoryRef.current = inventory; }, [inventory]);
+  useEffect(() => { droppedItemsRef.current = droppedItems; }, [droppedItems]);
 
   useEffect(() => {
     let d = 0;
@@ -36,14 +47,13 @@ const Player = ({
     let dy = facing.dy
     while (d < targetDistance) {
       const key = mapKey(x + d * dx, y + d * dy)
-      if (map.tiles[key]?.object) {
+      if (map.tiles[key]?.object && SOLID_OBJECTS.has(map.tiles[key].object.name)) {
         break
       }
       d++
     }
-    const tile = { x: Math.round(x + d * dx), y: Math.round(y + d * dy) }
-
-    selected = tile;
+    const offset = 0.2
+    const tile = { x: Math.round(x + (d - offset) * dx), y: Math.round(y + (d - offset) * dy) }
     onPlayerUpdate({ selected: tile })
   }, [position, facing, targetDistance, map])
 
@@ -52,9 +62,9 @@ const Player = ({
     if (selected.x !== curr.x || selected.y !== curr.y) {
       selectedRef.current = selected;
       onPlayerUpdate({ breakTimer: null })
-      if (heldKeys.current.has(KEY.BREAK)) {
+      if (heldKeys.current.has(KEY.USE)) {
         cancelBreak();
-        startBreak();
+        performAction();
       }
     }
   }, [selected])
@@ -76,12 +86,32 @@ const Player = ({
   };
 
   const canGo = (key) => {
-    return !SOLID_OBJECTS.has(mapRef.current.tiles[key]?.object?.name)
+    const tile = map.tiles[key];
+    if (!tile) return false;
+    // Can go through water (but it will be slow), just can't go through solid objects
+    return !SOLID_OBJECTS.has(tile.object?.name);
   }
 
   const moveTo = (x, y) => {
     onPlayerUpdate({ position: { x: x, y: y } });
   }
+
+  useEffect(() => {
+    const playerTileKey = mapKey(Math.round(position.x), Math.round(position.y));
+    const itemsAtPosition = droppedItems.filter(item => item.key === playerTileKey);
+    
+    if (itemsAtPosition.length > 0) {
+      const newContent = [...inventoryRef.current.content];
+      itemsAtPosition.forEach(item => {
+        for (let i = 0; i < item.count; i++) {
+          newContent.push(item.type);
+        }
+        onItemPickup(item.id);
+      });
+      const newInventory = { ...inventoryRef.current, content: newContent };
+      onPlayerUpdate({ inventory: newInventory });
+    }
+  }, [position.x, position.y, droppedItems]);
 
   const applyMovement = (delta) => {
     if (!heldKeys.current.has(KEY.STRAFE)) {
@@ -92,8 +122,13 @@ const Player = ({
     if (!heldKeys.current.has(KEY.STILL)) {
       const currX = positionRef.current.x
       const currY = positionRef.current.y
-      const newX = currX + delta.dx;
-      const newY = currY + delta.dy;
+      
+      // Check if currently in water - apply slow-down
+      const currentTile = map.tiles[mapKey(Math.round(currX), Math.round(currY))];
+      const movementMultiplier = currentTile?.has_water ? 0.5 : 1.0;
+      
+      const newX = currX + delta.dx * movementMultiplier;
+      const newY = currY + delta.dy * movementMultiplier;
 
       if (canGo(mapKey(newX, newY))) {
         moveTo(newX, newY)
@@ -111,24 +146,32 @@ const Player = ({
 
   const onMovementKeyDown = () => {
     const newMomentum = calculateMomentum();
-    onPlayerUpdate({ momentum: newMomentum });
-    clearInterval(movementInterval.current);
-    movementInterval.current = setInterval(() => {
+    onPlayerUpdate({ momentum: newMomentum, isMoving: true });
+    
+    if (movementInterval.current) {
+      cancelAnimationFrame(movementInterval.current);
+    }
+    
+    const animate = () => {
       if (!inventory.open) applyMovement(momentumRef.current);
-    }, MOVE_INTERVAL);
+      movementInterval.current = requestAnimationFrame(animate);
+    };
+    movementInterval.current = requestAnimationFrame(animate);
   };
 
   const onMovementKeyUp = () => {
     const newMomentum = calculateMomentum();
     onPlayerUpdate({ momentum: newMomentum });
     if (newMomentum.dx === 0 && newMomentum.dy === 0) {
-      clearInterval(movementInterval.current);
+      cancelAnimationFrame(movementInterval.current);
+      movementInterval.current = null;
+      onPlayerUpdate({ isMoving: false });
     }
   };
 
   const toggleInventory = () => {
-    inventory.open = !inventory.open
-    onPlayerUpdate({ inventory: inventory });
+    const newInventory = { ...inventoryRef.current, open: !inventoryRef.current.open };
+    onPlayerUpdate({ inventory: newInventory });
   }
 
   const loopTargetDistance = () => {
@@ -138,13 +181,218 @@ const Player = ({
   }
 
   const breakTile = (tile) => {
-    if (tile.object) {
-      delete tile.object
-    } else if (tile.ground) {
-      delete tile.ground
+    let droppedItems = [];
+    
+    // If tile has a hole, can break out of it or place something in it instead
+    // Water tiles are holes, so they shouldn't be breakable either
+    if (tile.has_hole || tile.has_water) {
+      return tile;
     }
+    
+    if (tile.object) {
+      const drops = getTileDrops(tile.object.name);
+      // For grass plants, use the drops from getTileDrops (wheat_seeds or nothing)
+      // For other objects, use drops or fall back to object name
+      if (tile.object.name === TileName.GRASS_PLANT) {
+        droppedItems = drops;
+      } else {
+        droppedItems = drops.length > 0 ? drops : [tile.object.name];
+      }
+      tile.object = null;
+    } else if (tile.ground) {
+      // Check if this is water - if so, water has already spread
+      if (tile.ground.name === TileName.WATER) {
+        // Water tiles already have water, just mark as hole
+        tile.has_water = false;
+        tile.has_hole = true;
+      } else {
+        // Get drops from ground tile
+        const drops = getTileDrops(tile.ground.name);
+        droppedItems = drops.length > 0 ? drops : [tile.ground.name];
+        tile.has_hole = true;
+      }
+    }
+    
+    if (droppedItems.length > 0) {
+      const tileKey = mapKey(tile.x, tile.y);
+      
+      // Drop each item type
+      droppedItems.forEach(droppedItem => {
+        const existingStack = droppedItemsRef.current.find(item => item.key === tileKey && item.type === droppedItem);
+        
+        if (existingStack) {
+          const updatedStack = { ...existingStack, count: existingStack.count + 1 };
+          onItemPickup(existingStack.id);
+          onItemDrop(updatedStack);
+        } else {
+          const randomOffsetX = (Math.random() - 0.5) * TILE_SIZE * 0.4;
+          const randomOffsetY = (Math.random() - 0.5) * TILE_SIZE * 0.4;
+          
+          onItemDrop({
+            id: `${tile.x}_${tile.y}_${Date.now()}_${droppedItem}`,
+            type: droppedItem,
+            key: tileKey,
+            tileX: tile.x,
+            tileY: tile.y,
+            x: tile.x * TILE_SIZE + TILE_SIZE * 0.3 + randomOffsetX,
+            y: tile.y * TILE_SIZE + TILE_SIZE * 0.3 + randomOffsetY,
+            count: 1
+          });
+        }
+      });
+    }
+    
+    return tile;
+  }
 
-    return tile
+  const placeTile = () => {
+    if (!inventoryRef.current.selectedType) return;
+    
+    const selectedItem = inventoryRef.current.selectedType;
+    
+    // Check if player has this item
+    if (!inventoryRef.current.content.includes(selectedItem)) return;
+    
+    const tileKey = mapKey(selectedRef.current.x, selectedRef.current.y);
+    const tile = map.tiles[tileKey];
+    if (!tile) return;
+    
+    console.log('Target tile ground:', tile.ground?.name, 'has_hole:', tile.has_hole, 'has_water:', tile.has_water);
+    
+    const placementResult = getPlacementResult(selectedItem, tile);
+    if (!placementResult) return;
+    
+    if (placementResult.type === 'fillHole') {
+      // Create the appropriate ground tile instance based on the placement ground type
+      let groundTile;
+      switch (placementResult.groundType) {
+        case TileName.GRASS:
+          groundTile = new Grass();
+          break;
+        case TileName.SAND:
+          groundTile = new Sand();
+          break;
+        case TileName.STONE:
+          groundTile = new Stone();
+          break;
+        default:
+          groundTile = new Grass();
+      }
+      
+      // Update the current tile instance to fill the hole/water
+      tile.ground = groundTile;
+      tile.has_hole = false;
+      tile.has_water = false;
+      tile.object = null;
+      
+      // Update the placed tile and surrounding tiles for texture rechecking
+      const tilesToUpdate = { [tileKey]: tile };
+      
+      // Also update adjacent tiles so they can recheck their textures (important for water/hole connections)
+      const [xStr, yStr] = tileKey.split('_');
+      const x = parseInt(xStr);
+      const y = parseInt(yStr);
+      
+      for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
+        const adjKey = mapKey(x + dx, y + dy);
+        const adjTile = map.tiles[adjKey];
+        if (adjTile) {
+          tilesToUpdate[adjKey] = adjTile;
+        }
+      }
+      
+      onTileUpdate(tilesToUpdate);
+      
+      // Remove only 1 item from inventory (first occurrence)
+      const newContent = [...inventoryRef.current.content];
+      const index = newContent.indexOf(selectedItem);
+      if (index > -1) {
+        newContent.splice(index, 1);
+      }
+      
+      const newInventory = { 
+        ...inventoryRef.current, 
+        content: newContent
+      };
+      onPlayerUpdate({ inventory: newInventory });
+    } else if (placementResult.type === 'placeObject') {
+      // Get variation count based on item type
+      let variationCount = 0;
+      switch (placementResult.objectType) {
+        case 'sunflower':
+          variationCount = 0; // Sunflower has no variations
+          break;
+        case 'daffodil':
+          variationCount = 2; // Daffodil has 2 variations
+          break;
+        case 'daisy':
+          variationCount = 4; // Daisy has 4 variations
+          break;
+      }
+      
+      // Choose random variation (or use default if no variations)
+      const variation = variationCount > 0 ? Math.floor(Math.random() * variationCount) + 1 : 1;
+      
+      // Get the tile name from item name
+      let tileNameType;
+      switch (placementResult.objectType) {
+        case 'sunflower':
+          tileNameType = TileName.SUNFLOWER;
+          break;
+        case 'daffodil':
+          tileNameType = TileName.DAFFODIL;
+          break;
+        case 'daisy':
+          tileNameType = TileName.DAISY;
+          break;
+      }
+      
+      // Create proper TileComponent instance using tileFactory
+      const tileObj = tileFactory({ type: tileNameType, variation });
+      tile.object = tileObj;
+      
+      const tilesToUpdate = { [tileKey]: tile };
+      onTileUpdate(tilesToUpdate);
+      
+      // Remove only 1 item from inventory (first occurrence)
+      const newContent = [...inventoryRef.current.content];
+      const index = newContent.indexOf(selectedItem);
+      if (index > -1) {
+        newContent.splice(index, 1);
+      }
+      
+      const newInventory = { 
+        ...inventoryRef.current, 
+        content: newContent
+      };
+      onPlayerUpdate({ inventory: newInventory });
+    }
+  }
+
+  const performAction = () => {
+    // Try to place the item first
+    if (inventoryRef.current.selectedType) {
+      const selectedItem = inventoryRef.current.selectedType;
+      const tileKey = mapKey(selectedRef.current.x, selectedRef.current.y);
+      const tile = map.tiles[tileKey];
+      
+      if (tile) {
+        const placementResult = getPlacementResult(selectedItem, tile);
+        if (placementResult) {
+          // Item can be placed, do the placement
+          placeTile();
+          return; // Exit after placing
+        }
+      }
+    }
+    
+    // If we can't place anything, try to break the tile
+    startBreak();
+  }
+
+  const cancelBreak = () => {
+    onPlayerUpdate({ breakTimer: null })
+    clearTimeout(breakTimeout.current);
   }
 
   const startBreak = () => {
@@ -153,20 +401,15 @@ const Player = ({
     breakTimeout.current = setTimeout(() => {
       let current = selectedRef.current
       let newTile = breakTile(map.tiles[mapKey(current.x, current.y)])
-      onMapUpdate({ [mapKey(current.x, current.y)]: newTile })
+      onTileUpdate({ [mapKey(current.x, current.y)]: newTile })
       onPlayerUpdate({ breakTimer: null })
 
-      if (heldKeys.current.has(KEY.BREAK)) {
+      if (heldKeys.current.has(KEY.USE)) {
         breakTimeout.current = setTimeout(() => {
           startBreak();
         }, 300)
       }
     }, timer)
-  }
-
-  const cancelBreak = () => {
-    onPlayerUpdate({ breakTimer: null })
-    clearTimeout(breakTimeout.current);
   }
 
   const onKeyDown = (event) => {
@@ -178,8 +421,21 @@ const Player = ({
       toggleInventory();
     } else if (key === KEY.TARGET_DISTANCE) {
       loopTargetDistance();
-    } else if (key === KEY.BREAK) {
-      startBreak();
+    } else if (key === KEY.USE) {
+      performAction();
+    } else if (key >= '1' && key <= '5' && !inventoryRef.current.open) {
+      // Hotbar quick-select: 1-5 selects hotbar items or deselects if empty
+      const hotbarSlot = parseInt(key) - 1;
+      const hotbarItem = inventoryRef.current.hotbar[hotbarSlot];
+      if (hotbarItem) {
+        // Only select if not already selected
+        if (inventoryRef.current.selectedType !== hotbarItem) {
+          onSelectItem(hotbarItem, hotbarSlot);
+        }
+      } else {
+        // If slot is empty, deselect
+        onSelectItem(null, hotbarSlot);
+      }
     } else if (!inventory.open && MOVEMENT_KEYS.has(key)) {
       onMovementKeyDown(key);
     }
@@ -190,7 +446,7 @@ const Player = ({
     if (!heldKeys.current.has(key)) return;
     heldKeys.current.delete(key);
 
-    if (key === KEY.BREAK) {
+    if (key === KEY.USE) {
       cancelBreak();
     } else if (MOVEMENT_KEYS.has(key)) onMovementKeyUp();
   };

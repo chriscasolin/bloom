@@ -1,10 +1,10 @@
 import { TileName } from "../util";
 import TileComponent from "./TileComponent";
 
-class Stone extends TileComponent {
+class StoneTile extends TileComponent {
   constructor() {
-    super(TileName.STONE, 'stone.png')
+    super(TileName.STONE, 'tiles/stone_tile.png')
   }
 }
 
-export default Stone;
+export default StoneTile;

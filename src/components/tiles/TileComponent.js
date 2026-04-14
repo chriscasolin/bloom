@@ -3,7 +3,6 @@ class TileComponent {
     this._name = name;
     this._texture = texture;
   }
-
   get name() {
     return this._name
   }

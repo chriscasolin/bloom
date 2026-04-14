@@ -1,17 +1,66 @@
-import Barrier from "./tiles/Barrier";
-import Tree from "./tiles/Tree";
-
 export const WORLD_FILE = '/worlds/demo.json'
 export const TILE_SIZE = 50; // px
 export const WINDOW_SIZE_X = 16;
 export const WINDOW_SIZE_Y = 12;
 
+export const KEY = {
+  NORTH: 'arrowup',
+  SOUTH: 'arrowdown',
+  EAST: 'arrowright',
+  WEST: 'arrowleft',
+  STILL: 's',
+  STRAFE: 'shift',
+  USE: ' ',
+  INTERACT: 'x',
+  INVENTORY: 'e',
+  TARGET_DISTANCE: 'a'
+}
+
+export const InventoryKeybinds = {
+  // Navigation
+  navigateUp: 'arrowup',
+  navigateDown: 'arrowdown',
+  navigateLeft: 'arrowleft',
+  navigateRight: 'arrowright',
+  
+  // Selection
+  select: ' ',
+  deselectCurrent: 'escape' 
+};
+
 export const TileName = {
   NONE: 'none',
   GRASS: 'grass',
+  GRASS_PLANT: 'grass_plant',
+  SUNFLOWER: 'sunflower',
+  DAFFODIL: 'daffodil',
+  DAISY: 'daisy',
   STONE: 'stone',
   BARRIER: 'barrier',
-  TREE: 'tree'
+  TREE: 'tree',
+  HOLE: 'hole',
+  WATER: 'water',
+  SAND: 'sand',
+  CACTUS: 'cactus',
+  DEAD_BUSH: 'dead_bush',
+  BUSH: 'bush',
+  GRANITE: 'granite'
+}
+
+export const ItemName = {
+  LOG: 'log',
+  STICK: 'stick',
+  LEAVES: 'leaves',
+  BERRIES: 'berries',
+  CACTUS: 'cactus',
+  SAND: 'sand',
+  DIRT: 'dirt',
+  STONE: 'stone',
+  GRANITE: 'granite',
+  WHEAT_SEEDS: 'wheat_seeds',
+  SUNFLOWER: 'sunflower',
+  DAFFODIL: 'daffodil',
+  DAISY: 'daisy'
 }
 
 export class direction {
@@ -35,6 +84,15 @@ export class direction {
     if (d.dx > 0 && d.dy > 0) return direction.SE;
     return direction.S;
   }
+
+  static cardinal() {
+    return [
+      direction.N,
+      direction.E,
+      direction.S,
+      direction.W
+    ]
+  }
 }
 
 export const INITIAL_DIRECTION = direction.S;
@@ -42,44 +100,33 @@ export const INITIAL_POSITION = { x: 0, y: 0 }
 
 export const link = (filename) => `url('textures/${filename}')`
 
-export const directionAsset = (d) => {
+export const playerDirectionAsset = (d) => {
   switch (d) {
     case direction.N:
-      return link('player_n.png')
+      return link('player/player_n.png')
     case direction.S:
-      return link('player_s.png')
+      return link('player/player_s.png')
     case direction.W:
-      return link('player_w.png')
+      return link('player/player_w.png')
     case direction.E:
-      return link('player_e.png')
+      return link('player/player_e.png')
     case direction.NW:
-      return link('player_nw.png')
+      return link('player/player_nw.png')
     case direction.NE:
-      return link('player_ne.png')
+      return link('player/player_ne.png')
     case direction.SW:
-      return link('player_sw.png')
+      return link('player/player_sw.png')
     case direction.SE:
-      return link('player_se.png')
+      return link('player/player_se.png')
     default:
       return link('missing.png')
   }
 }
 
-export const SOLID_OBJECTS = new Set([TileName.BARRIER, TileName.TREE])
+export const SOLID_OBJECTS = new Set([TileName.BARRIER, TileName.TREE, TileName.CACTUS, TileName.GRANITE])
+// export const SOLID_OBJECTS = new Set([TileName.BARRIER]) // empty for testing
+export const WATER_SPREADING_INTERVAL = 500; // ms between water spread ticks
 export const mapKey = (x, y) =>  `${Math.round(x)}_${Math.round(y)}`
-
-export const KEY = {
-  NORTH: 'arrowup',
-  SOUTH: 'arrowdown',
-  EAST: 'arrowright',
-  WEST: 'arrowleft',
-  STILL: 'alt',
-  STRAFE: 'shift',
-  BREAK: 'c',
-  INTERACT: 'x',
-  INVENTORY: 'd',
-  TARGET_DISTANCE: 'a'
-}
 
 export const MOVEMENT_KEYS = new Set([KEY.NORTH, KEY.SOUTH, KEY.EAST, KEY.WEST]);
 
@@ -91,6 +138,151 @@ export const target_coord = (position, facing, target_distance) => {
   return { x: target_x, y: target_y }
 }
 
-export const MAX_TARGET_DISTANCE = 2;
+export const MAX_TARGET_DISTANCE = 1;
 
 export const BREAK_TIME = 300;
+
+/**
+ * Get the items that drop from breaking a tile
+ * Returns an array of item types that should be dropped
+ */
+export const getTileDrops = (tileName) => {
+  switch (tileName) {
+    case TileName.TREE:
+      return [ItemName.LOG, ItemName.STICK, ItemName.LEAVES];
+    case TileName.BUSH:
+      return [ItemName.STICK, ItemName.BERRIES];
+    case TileName.CACTUS:
+      return [ItemName.CACTUS];
+    case TileName.SAND:
+      return [ItemName.SAND];
+    case TileName.GRASS:
+      // GrassTile always drops dirt
+      return [ItemName.DIRT];
+    case TileName.GRASS_PLANT:
+      // GrassPlant has 1/3 chance to drop wheat_seeds, otherwise drop nothing
+      return Math.random() < 1/3 ? [ItemName.WHEAT_SEEDS] : [];
+    case TileName.SUNFLOWER:
+      return [ItemName.SUNFLOWER];
+    case TileName.DAFFODIL:
+      return [ItemName.DAFFODIL];
+    case TileName.DAISY:
+      return [ItemName.DAISY];
+    case TileName.STONE:
+      return [ItemName.STONE];
+    case TileName.DEAD_BUSH:
+      return [ItemName.STICK];
+    case TileName.GRANITE:
+      return [ItemName.GRANITE];
+    default:
+      return [];
+  }
+};
+
+/**
+ * Get the texture path for an item type
+ */
+export const getItemTexture = (itemType) => {
+  switch (itemType) {
+    case '__empty__':
+      return 'hand.png';
+    case 'log':
+      return 'items/log_item.png';
+    case 'stick':
+      return 'items/stick_item.png';
+    case 'leaves':
+      return 'items/leaves_item.png';
+    case 'berries':
+      return 'items/berries_item.png';
+    case 'cactus':
+      return 'items/cactus_item.png';
+    case 'sand':
+      return 'items/sand_item.png';
+    case 'dirt':
+      return 'items/dirt_item.png';
+    case 'stone':
+      return 'items/stone_item.png';
+    case 'granite':
+      return 'items/granite_item.png';
+    case 'wheat_seeds':
+      return 'items/wheat_seeds.png';
+    case 'sunflower':
+      return 'items/sunflower_item.png';
+    case 'daffodil':
+      return 'items/daffodil_item.png';
+    case 'daisy':
+      return 'items/daisy_item.png';
+    case 'tree':
+      return 'tree_outlined.png';
+    case 'grass':
+      return 'grass.png';
+    default:
+      return 'missing.png';
+  }
+};
+
+/**
+ * Placement rules - defines what items can be placed and where
+ * Each entry maps from an item type to its placement rules
+ * 
+ * Placement options:
+ * - fillHole: if true, can fill holes with this material (becomes the ground tile)
+ * - placeOnTop: if true, can place this as an object on certain tiles
+ */
+export const PlacementRules = {
+  'dirt': {
+    fillHole: true,
+    placeOnTop: false
+  },
+  'sand': {
+    fillHole: true,
+    placeOnTop: false
+  },
+  'stone': {
+    fillHole: true,
+    placeOnTop: false
+  },
+  'sunflower': {
+    fillHole: false,
+    placeOnTop: true,
+    onlyOnGrass: true
+  },
+  'daffodil': {
+    fillHole: false,
+    placeOnTop: true,
+    onlyOnGrass: true
+  },
+  'daisy': {
+    fillHole: false,
+    placeOnTop: true,
+    onlyOnGrass: true
+  }
+};
+
+/**
+ * Check if an item can be placed and what action it performs
+ * Returns the placement result or null if placement isn't allowed
+ */
+export const getPlacementResult = (itemType, tile) => {
+  const rules = PlacementRules[itemType];
+  if (!rules) return null;
+
+  // Can fill holes or water with the fillHole items
+  if (rules.fillHole && (tile.has_hole || tile.has_water)) {
+    console.log('Filling hole/water on tile with ground:', tile.ground?.name, 'has_hole:', tile.has_hole, 'has_water:', tile.has_water);
+    return {
+      type: 'fillHole',
+      groundType: itemType === 'dirt' ? TileName.GRASS : (itemType === 'sand' ? TileName.SAND : TileName.STONE)
+    };
+  }
+
+  // Can place flowers on grass tiles
+  if (rules.placeOnTop && rules.onlyOnGrass && tile.ground?.name === TileName.GRASS && !tile.object) {
+    return {
+      type: 'placeObject',
+      objectType: itemType
+    };
+  }
+
+  return null;
+};

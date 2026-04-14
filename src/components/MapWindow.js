@@ -1,8 +1,12 @@
 import Inventory from "./Inventory";
 import TileVisual from "./TileVisual";
+import DroppedItem from "./DroppedItem";
+import SelectedItemDisplay from "./SelectedItemDisplay";
+import Hotbar from "./Hotbar";
 // import '../css/Map.css';
-import { directionAsset, mapKey, TILE_SIZE, WINDOW_SIZE_X, WINDOW_SIZE_Y } from "./util";
+import { direction, playerDirectionAsset, mapKey, TILE_SIZE, WINDOW_SIZE_X, WINDOW_SIZE_Y } from "./util";
 import styled from "styled-components";
+import { useMemo } from "react";
 
 const PlayerContainer = styled.div`
   width: ${TILE_SIZE}px;
@@ -23,6 +27,17 @@ const PlayerGraphic = styled.div`
   background-size: cover;
   position: absolute;
   margin-bottom: 25%;
+  clip-path: ${({ $inWater }) => $inWater ? 'inset(0 0 28% 0)' : 'none'};
+  animation: ${({ $isMoving }) => $isMoving ? 'bob 0.3s infinite' : 'none'};
+  
+  @keyframes bob {
+    0%, 100% {
+      transform: translateY(0px);
+    }
+    50% {
+      transform: translateY(-3px);
+    }
+  }
 `
 
 const Shadow = styled.div`
@@ -33,6 +48,8 @@ const Shadow = styled.div`
   box-shadow: 0px 0px 2px rgb(0,0,0);
   border-radius: 50%;
   position: absolute;
+  opacity: ${({ $inWater }) => $inWater ? '0' : '1'};
+  transition: opacity 0.2s ease;
 `
 
 const MapContent = styled.div.attrs(({ $offsetX, $offsetY }) => ({
@@ -44,7 +61,7 @@ const MapContent = styled.div.attrs(({ $offsetX, $offsetY }) => ({
   width: ${({ $numCols }) => $numCols * TILE_SIZE}px;
   height: ${({ $numRows }) => $numRows * TILE_SIZE}px;
   position: absolute;
-  transition: transform 0.05s linear;
+  transition: none;
 `;
 
 const Window = styled.div`
@@ -58,12 +75,29 @@ const Window = styled.div`
   border-radius: 5px;
 `
 
-const MapWindow = ({ map,
+const BottomUIContainer = styled.div`
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  z-index: 100;
+`
+
+const MapWindow = ({
+  map,
   position,
   facing,
   inventory,
   selected,
-  breakTimer
+  breakTimer,
+  isMoving,
+  droppedItems,
+  onSelectItem,
+  onInventoryClose,
+  onHotbarItemAdd
 }) => {
   const numRows = map.size.y;
   const numCols = map.size.x;
@@ -78,22 +112,44 @@ const MapWindow = ({ map,
   const minY = Math.floor(Math.max(0, offsetY - halfWindowY));
   const maxY = Math.floor(Math.min(numRows - 1, offsetY + halfWindowY));
 
-  const visibleTiles = [];
-  for (let y = minY; y <= maxY; y++) {
-    for (let x = minX; x <= maxX; x++) {
-      const key = mapKey(x, y)
-      visibleTiles.push(
-        <TileVisual
-          key={key}
-          data={map.tiles[key]}
-          x={x}
-          y={y}
-          selected={selected}
-          breakTimer={breakTimer}
-        />
-      );
+  const adjacentCache = useMemo(() => {
+    const cache = {};
+    for (let y = minY - 1; y <= maxY + 1; y++) {
+      for (let x = minX - 1; x <= maxX + 1; x++) {
+        const key = mapKey(x, y);
+        const adjacents = [];
+        const cardinals = direction.cardinal();
+        for (let i = 0; i < cardinals.length; i++) {
+          const d = cardinals[i];
+          const adjKey = mapKey(x + d.dx, y + d.dy);
+          adjacents.push({tile: map.tiles[adjKey], direction: d});
+        }
+        cache[key] = adjacents;
+      }
     }
-  }
+    return cache;
+  }, [minX, maxX, minY, maxY, map.tiles]);
+
+  const visibleTiles = useMemo(() => {
+    const tiles = [];
+    for (let y = minY; y <= maxY; y++) {
+      for (let x = minX; x <= maxX; x++) {
+        const key = mapKey(x, y);
+        tiles.push(
+          <TileVisual
+            key={key}
+            tileObj={map.tiles[key]}
+            x={x}
+            y={y}
+            selected={selected}
+            breakTimer={breakTimer}
+            adjacentTiles={adjacentCache[key]}
+          />
+        );
+      }
+    }
+    return tiles;
+  }, [minX, maxX, minY, maxY, map.tiles, selected, breakTimer, adjacentCache]);
 
   return (
     <Window className="map-window">
@@ -105,20 +161,35 @@ const MapWindow = ({ map,
         $offsetY={offsetY}
       >
         {visibleTiles}
+        {droppedItems.map(item => (
+          <DroppedItem key={item.id} item={item} />
+        ))}
       </MapContent>
       <PlayerContainer
         className="player-overlay"
       >
-        <Shadow />
+        <Shadow $inWater={map.tiles[mapKey(Math.round(position.x), Math.round(position.y))]?.has_water || false} />
         <PlayerGraphic
-          $background={directionAsset(facing)}
+          $background={playerDirectionAsset(facing)}
+          $isMoving={isMoving}
+          $inWater={map.tiles[mapKey(Math.round(position.x), Math.round(position.y))]?.has_water || false}
         />
       </PlayerContainer>
       {
         inventory.open &&
         <Inventory
-          content={inventory.content} />
+          content={inventory.content}
+          selectedType={inventory.selectedType}
+          onSelectItem={onSelectItem}
+          onClose={onInventoryClose}
+          hotbar={inventory.hotbar}
+          onHotbarItemAdd={onHotbarItemAdd}
+        />
       }
+      <BottomUIContainer>
+        <SelectedItemDisplay selectedType={inventory.selectedType} inventoryContent={inventory.content} />
+        <Hotbar hotbar={inventory.hotbar} inventoryContent={inventory.content} selectedType={inventory.selectedType} selectedHotbarIndex={inventory.selectedHotbarIndex} onSelectItem={onSelectItem} />
+      </BottomUIContainer>
     </Window>
   );
 };

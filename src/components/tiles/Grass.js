@@ -1,10 +1,10 @@
 import { TileName } from "../util";
 import TileComponent from "./TileComponent";
 
-class Grass extends TileComponent {
+class GrassTile extends TileComponent {
   constructor() {
-    super(TileName.GRASS, 'grass.png')
+    super(TileName.GRASS, 'tiles/grass_tile.png')
   }
 }
 
-export default Grass;
+export default GrassTile;

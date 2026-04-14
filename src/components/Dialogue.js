@@ -1,4 +1,5 @@
 import styled from "styled-components"
+import { link } from "./util"
 
 const Background = styled.div`
   height: 100%;
@@ -13,12 +14,15 @@ const Background = styled.div`
 `
 
 const Content = styled.div`
-  height: 80%;
-  width: 80%;
-
-  border-radius: 5px;
-  border: 0.2rem solid black;
-  background-color: rgba(200, 200, 200, 0.7)
+  height: 100%;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  background-image: ${link('menu/menu.png')};
+  background-size: cover;
+  background-repeat: no-repeat;
+  background-position: center;
+  box-sizing: border-box;
 `
 
 const Dialogue = ({ children }) => {
