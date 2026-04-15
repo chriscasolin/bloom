@@ -1,5 +1,5 @@
 import styled from "styled-components";
-import { link, getItemTexture, TILE_SIZE } from "./util";
+import { link, getItemTexture } from "./util";
 
 const DisplayContainer = styled.div`
   display: flex;
@@ -35,14 +35,6 @@ const ItemImage = styled.div`
   background-size: contain;
   background-repeat: no-repeat;
   background-position: center;
-`;
-
-const ItemLabel = styled.div`
-  color: #111;
-  font-family: monospace;
-  font-size: 14px;
-  font-weight: bold;
-  text-transform: capitalize;
 `;
 
 const ItemCount = styled.div`

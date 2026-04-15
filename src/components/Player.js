@@ -1,11 +1,11 @@
-import { use, useEffect, useRef } from "react";
+import { useEffect, useRef, useCallback } from "react";
 import { BREAK_TIME, direction, KEY, keyCode, mapKey, MAX_TARGET_DISTANCE, MOVEMENT_KEYS, SOLID_OBJECTS, TILE_SIZE, TileName, getTileDrops, getPlacementResult } from "./util";
 import Grass from "./tiles/Grass";
 import Stone from "./tiles/Stone";
 import Sand from "./tiles/Sand";
 import { tileFactory } from "./tiles/Tile";
 
-const MOVE_INTERVAL = 50;
+// const MOVE_INTERVAL = 50;
 const MOVE_AMOUNT = 0.1;
 // const MOVE_AMOUNT = 1;
 
@@ -31,6 +31,7 @@ const Player = ({
   const selectedRef = useRef(selected);
   const inventoryRef = useRef(inventory);
   const droppedItemsRef = useRef(droppedItems);
+  const targetDistanceRef = useRef(targetDistance);
   const movementInterval = useRef(null);
   const breakTimeout = useRef(null);
 
@@ -38,6 +39,7 @@ const Player = ({
   useEffect(() => { momentumRef.current = momentum; }, [momentum]);
   useEffect(() => { inventoryRef.current = inventory; }, [inventory]);
   useEffect(() => { droppedItemsRef.current = droppedItems; }, [droppedItems]);
+  useEffect(() => { targetDistanceRef.current = targetDistance; }, [targetDistance]);
 
   useEffect(() => {
     let d = 0;
@@ -55,132 +57,14 @@ const Player = ({
     const offset = 0.2
     const tile = { x: Math.round(x + (d - offset) * dx), y: Math.round(y + (d - offset) * dy) }
     onPlayerUpdate({ selected: tile })
-  }, [position, facing, targetDistance, map])
+  }, [position, facing, targetDistance, map, onPlayerUpdate])
 
-  useEffect(() => {
-    let curr = selectedRef.current
-    if (selected.x !== curr.x || selected.y !== curr.y) {
-      selectedRef.current = selected;
-      onPlayerUpdate({ breakTimer: null })
-      if (heldKeys.current.has(KEY.USE)) {
-        cancelBreak();
-        performAction();
-      }
-    }
-  }, [selected])
+  const cancelBreak = useCallback(() => {
+    onPlayerUpdate({ breakTimer: null })
+    clearTimeout(breakTimeout.current);
+  }, [onPlayerUpdate]);
 
-  const calculateMomentum = () => {
-    const keys = heldKeys.current;
-    let dx = 0, dy = 0;
-    if (keys.has(KEY.NORTH)) dy -= MOVE_AMOUNT;
-    if (keys.has(KEY.SOUTH)) dy += MOVE_AMOUNT;
-    if (keys.has(KEY.WEST)) dx -= MOVE_AMOUNT;
-    if (keys.has(KEY.EAST)) dx += MOVE_AMOUNT;
-
-    if (dx && dy) {
-      dx = dx * 0.7
-      dy = dy * 0.7
-    }
-
-    return { dx, dy };
-  };
-
-  const canGo = (key) => {
-    const tile = map.tiles[key];
-    if (!tile) return false;
-    // Can go through water (but it will be slow), just can't go through solid objects
-    return !SOLID_OBJECTS.has(tile.object?.name);
-  }
-
-  const moveTo = (x, y) => {
-    onPlayerUpdate({ position: { x: x, y: y } });
-  }
-
-  useEffect(() => {
-    const playerTileKey = mapKey(Math.round(position.x), Math.round(position.y));
-    const itemsAtPosition = droppedItems.filter(item => item.key === playerTileKey);
-    
-    if (itemsAtPosition.length > 0) {
-      const newContent = [...inventoryRef.current.content];
-      itemsAtPosition.forEach(item => {
-        for (let i = 0; i < item.count; i++) {
-          newContent.push(item.type);
-        }
-        onItemPickup(item.id);
-      });
-      const newInventory = { ...inventoryRef.current, content: newContent };
-      onPlayerUpdate({ inventory: newInventory });
-    }
-  }, [position.x, position.y, droppedItems]);
-
-  const applyMovement = (delta) => {
-    if (!heldKeys.current.has(KEY.STRAFE)) {
-      const newDirection = direction.of(calculateMomentum());
-      if (newDirection) onPlayerUpdate({ facing: newDirection });
-    }
-
-    if (!heldKeys.current.has(KEY.STILL)) {
-      const currX = positionRef.current.x
-      const currY = positionRef.current.y
-      
-      // Check if currently in water - apply slow-down
-      const currentTile = map.tiles[mapKey(Math.round(currX), Math.round(currY))];
-      const movementMultiplier = currentTile?.has_water ? 0.5 : 1.0;
-      
-      const newX = currX + delta.dx * movementMultiplier;
-      const newY = currY + delta.dy * movementMultiplier;
-
-      if (canGo(mapKey(newX, newY))) {
-        moveTo(newX, newY)
-        // Diagonal position may be blocked, so slide against wall
-      } else if (currX !== newX && currY !== newY) { // Prevent uneccesary checks
-        if (canGo(mapKey(currX, newY))) {
-          moveTo(currX, newY)
-        } else if (canGo(mapKey(newX, currY))) {
-          moveTo(newX, currY)
-        }
-      }
-
-    }
-  };
-
-  const onMovementKeyDown = () => {
-    const newMomentum = calculateMomentum();
-    onPlayerUpdate({ momentum: newMomentum, isMoving: true });
-    
-    if (movementInterval.current) {
-      cancelAnimationFrame(movementInterval.current);
-    }
-    
-    const animate = () => {
-      if (!inventory.open) applyMovement(momentumRef.current);
-      movementInterval.current = requestAnimationFrame(animate);
-    };
-    movementInterval.current = requestAnimationFrame(animate);
-  };
-
-  const onMovementKeyUp = () => {
-    const newMomentum = calculateMomentum();
-    onPlayerUpdate({ momentum: newMomentum });
-    if (newMomentum.dx === 0 && newMomentum.dy === 0) {
-      cancelAnimationFrame(movementInterval.current);
-      movementInterval.current = null;
-      onPlayerUpdate({ isMoving: false });
-    }
-  };
-
-  const toggleInventory = () => {
-    const newInventory = { ...inventoryRef.current, open: !inventoryRef.current.open };
-    onPlayerUpdate({ inventory: newInventory });
-  }
-
-  const loopTargetDistance = () => {
-    targetDistance = targetDistance + 1;
-    if (targetDistance > MAX_TARGET_DISTANCE) targetDistance = 0;
-    onPlayerUpdate({ targetDistance: targetDistance });
-  }
-
-  const breakTile = (tile) => {
+  const breakTile = useCallback((tile) => {
     let droppedItems = [];
     
     // If tile has a hole, can break out of it or place something in it instead
@@ -243,9 +127,26 @@ const Player = ({
     }
     
     return tile;
-  }
+  }, [onItemPickup, onItemDrop]);
 
-  const placeTile = () => {
+  const startBreakCallback = useCallback(() => {
+    let timer = BREAK_TIME
+    onPlayerUpdate({ breakTimer: timer })
+    breakTimeout.current = setTimeout(() => {
+      let current = selectedRef.current
+      let newTile = breakTile(map.tiles[mapKey(current.x, current.y)])
+      onTileUpdate({ [mapKey(current.x, current.y)]: newTile })
+      onPlayerUpdate({ breakTimer: null })
+
+      if (heldKeys.current.has(KEY.USE)) {
+        breakTimeout.current = setTimeout(() => {
+          startBreakCallback();
+        }, 300)
+      }
+    }, timer)
+  }, [onPlayerUpdate, onTileUpdate, map, breakTile]);
+
+  const placeTile = useCallback(() => {
     if (!inventoryRef.current.selectedType) return;
     
     const selectedItem = inventoryRef.current.selectedType;
@@ -328,6 +229,8 @@ const Player = ({
         case 'daisy':
           variationCount = 4; // Daisy has 4 variations
           break;
+        default:
+          variationCount = 0;
       }
       
       // Choose random variation (or use default if no variations)
@@ -345,6 +248,8 @@ const Player = ({
         case 'daisy':
           tileNameType = TileName.DAISY;
           break;
+        default:
+          tileNameType = TileName.UNKNOWN
       }
       
       // Create proper TileComponent instance using tileFactory
@@ -367,9 +272,9 @@ const Player = ({
       };
       onPlayerUpdate({ inventory: newInventory });
     }
-  }
+  }, [onTileUpdate, onPlayerUpdate, map]);
 
-  const performAction = () => {
+  const performAction = useCallback(() => {
     // Try to place the item first
     if (inventoryRef.current.selectedType) {
       const selectedItem = inventoryRef.current.selectedType;
@@ -387,32 +292,136 @@ const Player = ({
     }
     
     // If we can't place anything, try to break the tile
-    startBreak();
-  }
+    startBreakCallback();
+  }, [map, startBreakCallback, placeTile]);
 
-  const cancelBreak = () => {
-    onPlayerUpdate({ breakTimer: null })
-    clearTimeout(breakTimeout.current);
-  }
-
-  const startBreak = () => {
-    let timer = BREAK_TIME
-    onPlayerUpdate({ breakTimer: timer })
-    breakTimeout.current = setTimeout(() => {
-      let current = selectedRef.current
-      let newTile = breakTile(map.tiles[mapKey(current.x, current.y)])
-      onTileUpdate({ [mapKey(current.x, current.y)]: newTile })
+  useEffect(() => {
+    let curr = selectedRef.current
+    if (selected.x !== curr.x || selected.y !== curr.y) {
+      selectedRef.current = selected;
       onPlayerUpdate({ breakTimer: null })
-
       if (heldKeys.current.has(KEY.USE)) {
-        breakTimeout.current = setTimeout(() => {
-          startBreak();
-        }, 300)
+        cancelBreak();
+        performAction();
       }
-    }, timer)
-  }
+    }
+  }, [selected, onPlayerUpdate, cancelBreak, performAction])
 
-  const onKeyDown = (event) => {
+  const calculateMomentum = () => {
+    const keys = heldKeys.current;
+    let dx = 0, dy = 0;
+    if (keys.has(KEY.NORTH)) dy -= MOVE_AMOUNT;
+    if (keys.has(KEY.SOUTH)) dy += MOVE_AMOUNT;
+    if (keys.has(KEY.WEST)) dx -= MOVE_AMOUNT;
+    if (keys.has(KEY.EAST)) dx += MOVE_AMOUNT;
+
+    if (dx && dy) {
+      dx = dx * 0.7
+      dy = dy * 0.7
+    }
+
+    return { dx, dy };
+  };
+
+  const canGo = useCallback((key) => {
+    const tile = map.tiles[key];
+    if (!tile) return false;
+    // Can go through water (but it will be slow), just can't go through solid objects
+    return !SOLID_OBJECTS.has(tile.object?.name);
+  }, [map]);
+
+  const moveTo = useCallback((x, y) => {
+    onPlayerUpdate({ position: { x: x, y: y } });
+  }, [onPlayerUpdate]);
+
+  useEffect(() => {
+    const playerTileKey = mapKey(Math.round(position.x), Math.round(position.y));
+    const itemsAtPosition = droppedItems.filter(item => item.key === playerTileKey);
+    
+    if (itemsAtPosition.length > 0) {
+      const newContent = [...inventoryRef.current.content];
+      itemsAtPosition.forEach(item => {
+        for (let i = 0; i < item.count; i++) {
+          newContent.push(item.type);
+        }
+        onItemPickup(item.id);
+      });
+      const newInventory = { ...inventoryRef.current, content: newContent };
+      onPlayerUpdate({ inventory: newInventory });
+    }
+  }, [position.x, position.y, droppedItems, onItemPickup, onPlayerUpdate]);
+
+  const applyMovement = useCallback((delta) => {
+    if (!heldKeys.current.has(KEY.STRAFE)) {
+      const newDirection = direction.of(calculateMomentum());
+      if (newDirection) onPlayerUpdate({ facing: newDirection });
+    }
+
+    if (!heldKeys.current.has(KEY.STILL)) {
+      const currX = positionRef.current.x
+      const currY = positionRef.current.y
+      
+      // Check if currently in water - apply slow-down
+      const currentTile = map.tiles[mapKey(Math.round(currX), Math.round(currY))];
+      const movementMultiplier = currentTile?.has_water ? 0.5 : 1.0;
+      
+      const newX = currX + delta.dx * movementMultiplier;
+      const newY = currY + delta.dy * movementMultiplier;
+
+      if (canGo(mapKey(newX, newY))) {
+        moveTo(newX, newY)
+        // Diagonal position may be blocked, so slide against wall
+      } else if (currX !== newX && currY !== newY) { // Prevent uneccesary checks
+        if (canGo(mapKey(currX, newY))) {
+          moveTo(currX, newY)
+        } else if (canGo(mapKey(newX, currY))) {
+          moveTo(newX, currY)
+        }
+      }
+
+    }
+  }, [onPlayerUpdate, map, canGo, moveTo]);
+
+  const onMovementKeyDown = useCallback(() => {
+    const newMomentum = calculateMomentum();
+    onPlayerUpdate({ momentum: newMomentum, isMoving: true });
+    
+    if (movementInterval.current) {
+      cancelAnimationFrame(movementInterval.current);
+    }
+    
+    const animate = () => {
+      if (!inventory.open) applyMovement(momentumRef.current);
+      movementInterval.current = requestAnimationFrame(animate);
+    };
+    movementInterval.current = requestAnimationFrame(animate);
+  }, [onPlayerUpdate, inventory.open, applyMovement]);
+
+  const onMovementKeyUp = useCallback(() => {
+    const newMomentum = calculateMomentum();
+    onPlayerUpdate({ momentum: newMomentum });
+    if (newMomentum.dx === 0 && newMomentum.dy === 0) {
+      cancelAnimationFrame(movementInterval.current);
+      movementInterval.current = null;
+      onPlayerUpdate({ isMoving: false });
+    }
+  }, [onPlayerUpdate]);
+
+  const toggleInventory = useCallback(() => {
+    const newInventory = { ...inventoryRef.current, open: !inventoryRef.current.open };
+    onPlayerUpdate({ inventory: newInventory });
+  }, [onPlayerUpdate]);
+
+  const loopTargetDistance = useCallback(() => {
+    targetDistanceRef.current = targetDistanceRef.current + 1;
+    if (targetDistanceRef.current > MAX_TARGET_DISTANCE) targetDistanceRef.current = 0;
+    onPlayerUpdate({ targetDistance: targetDistanceRef.current });
+  }, [onPlayerUpdate]);
+
+
+
+
+  const onKeyDown = useCallback((event) => {
     const key = keyCode(event)
     if (heldKeys.current.has(key)) return;
     heldKeys.current.add(key);
@@ -439,9 +448,9 @@ const Player = ({
     } else if (!inventory.open && MOVEMENT_KEYS.has(key)) {
       onMovementKeyDown(key);
     }
-  };
+  }, [toggleInventory, loopTargetDistance, performAction, onSelectItem, inventory.open, onMovementKeyDown]);
 
-  const onKeyUp = (event) => {
+  const onKeyUp = useCallback((event) => {
     const key = keyCode(event)
     if (!heldKeys.current.has(key)) return;
     heldKeys.current.delete(key);
@@ -449,7 +458,7 @@ const Player = ({
     if (key === KEY.USE) {
       cancelBreak();
     } else if (MOVEMENT_KEYS.has(key)) onMovementKeyUp();
-  };
+  }, [cancelBreak, onMovementKeyUp]);
 
   useEffect(() => {
     window.addEventListener("keydown", onKeyDown);
@@ -458,7 +467,7 @@ const Player = ({
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("keyup", onKeyUp);
     };
-  }, []);
+  }, [onKeyDown, onKeyUp]);
 
   return null;
 };

@@ -717,29 +717,15 @@ export const generateBiomeWorld = (width, height, options = {}) => {
  */
 export const generateRandomWorld = (width, height, options = {}) => {
   const {
-    grassDensity = 0.6,
-    treeDensity = 0.5,
-    stoneDensity = 0.15,
-    holeDensity = 0.05,
     barrierOnEdges = true,
-    seed = null
+    // seed = null
   } = options;
 
   const tiles = {};
-  const random = seed !== null ? seededRandom(seed) : Math.random;
-
-  const getRandomTile = () => {
-    const r = random();
-    if (r < grassDensity) return TileName.GRASS;
-    if (r < grassDensity + treeDensity) return TileName.TREE;
-    if (r < grassDensity + treeDensity + stoneDensity) return TileName.STONE;
-    return TileName.GRASS;
-  };
 
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
       const key = mapKey(x, y);
-      const groundType = getRandomTile();
       
       let objectType = null;
 
@@ -786,11 +772,6 @@ export const generateRandomWorld = (width, height, options = {}) => {
 export const getWorld = async (worldName = 'demo') => {
   if (worldName === 'random') {
     return generateBiomeWorld(200, 200);
-  } else if (worldName === 'random-simple') {
-    return generateRandomWorld(100, 100);
-  } else if (worldName.startsWith('random-seed-')) {
-    const seed = parseInt(worldName.split('-').pop());
-    return generateBiomeWorld(200, 200, { seed });
   }
 
   try {

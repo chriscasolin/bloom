@@ -1,8 +1,8 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import MapWindow from "./MapWindow";
 import Player from "./Player";
 import DebugUI from "./DebugUI";
-import { INITIAL_DIRECTION, MAX_TARGET_DISTANCE, WORLD_FILE, WATER_SPREADING_INTERVAL } from "./util";
+import { INITIAL_DIRECTION, MAX_TARGET_DISTANCE, WATER_SPREADING_INTERVAL } from "./util";
 import Tile from "./tiles/Tile";
 import { getWorld, getBiomeAtPosition } from "./worldGenerator";
 import { WaterEngine } from "./waterEngine";
@@ -48,7 +48,7 @@ const Game = () => {
 
         // Get URL params to check for world selection
         const params = new URLSearchParams(window.location.search);
-        const worldName = params.get('world') || currentWorld;
+        const worldName = params.get('world') || 'random';
 
         // Use the world generator for random or specific worlds
         const data = await getWorld(worldName);
@@ -126,27 +126,20 @@ const Game = () => {
     };
   }, []); // Empty deps - set up once on mount, never recreate
 
-  const handleNewRandomWorld = () => {
-    waterEngineRef.current.reset();
-    if (waterSpreadIntervalRef.current) {
-      clearInterval(waterSpreadIntervalRef.current);
-      waterSpreadIntervalRef.current = null;
-    }
-    setMap(null);
-    setDroppedItems([]);
-  };
-
   // Cleanup on unmount
   useEffect(() => {
+    const waterEngine = waterEngineRef.current;
     return () => {
       if (waterSpreadIntervalRef.current) {
         clearInterval(waterSpreadIntervalRef.current);
       }
-      waterEngineRef.current.reset();
+      if (waterEngine) {
+        waterEngine.reset();
+      }
     };
   }, []);
 
-  const handlePlayerUpdate = (updates) => {
+  const handlePlayerUpdate = useCallback((updates) => {
     setPlayerState((prev) => {
       const newState = { ...prev, ...updates };
 
@@ -182,7 +175,7 @@ const Game = () => {
 
       return newState;
     });
-  };
+  }, []);
 
   const handleSelectItem = (itemType, hotbarIndex = null) => {
     setPlayerState((prev) => ({
@@ -225,7 +218,7 @@ const Game = () => {
     });
   };
 
-  const handleTileUpdate = (tileUpdates) => {
+  const handleTileUpdate = useCallback((tileUpdates) => {
     setMap(prev => {
       const newTiles = {};
 
@@ -271,7 +264,7 @@ const Game = () => {
         }
       }
     }
-  };
+  }, []);
 
   const handleItemDrop = (item) => {
     setDroppedItems(prev => [...prev, item]);
@@ -328,16 +321,6 @@ const Game = () => {
         gap: '10px',
         flexDirection: 'column'
       }}>
-        <button onClick={handleNewRandomWorld} style={{
-          padding: '10px 15px',
-          backgroundColor: '#909090ff',
-          color: 'white',
-          border: 'none',
-          borderRadius: '4px',
-          cursor: 'pointer',
-        }}>
-          Regen Random
-        </button>
         <select
           defaultValue={currentWorld}
           onChange={(e) => {
@@ -353,11 +336,8 @@ const Game = () => {
             cursor: 'pointer'
           }}
         >
-          <option value="demo">Demo World</option>
-          <option value="empty">Empty World</option>
-          <option value="large">Large World</option>
           <option value="random">Random World</option>
-          <option value="random-simple">Random Simple</option>
+          <option value="demo">Demo World</option>
         </select>
       </div>
     </>

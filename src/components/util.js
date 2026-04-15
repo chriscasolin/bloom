@@ -44,7 +44,8 @@ export const TileName = {
   CACTUS: 'cactus',
   DEAD_BUSH: 'dead_bush',
   BUSH: 'bush',
-  GRANITE: 'granite'
+  GRANITE: 'granite',
+  UNKNOWN: 'unknown'
 }
 
 export const ItemName = {

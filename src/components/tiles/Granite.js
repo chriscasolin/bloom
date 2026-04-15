@@ -1,4 +1,3 @@
-import { TileName } from "../util";
 import TileComponent from "./TileComponent";
 
 class Granite extends TileComponent {

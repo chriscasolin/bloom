@@ -1,7 +1,7 @@
 import Dialogue from "./Dialogue"
 import styled from "styled-components"
 import { link, getItemTexture, InventoryKeybinds } from "./util"
-import { useEffect, useState, useRef } from "react"
+import { useEffect, useState, useRef, useMemo } from "react"
 
 const InventoryContainer = styled.div`
   display: flex;
@@ -99,7 +99,7 @@ const Inventory = ({ content, selectedType, onSelectItem, onClose, hotbar, onHot
   }
   
   // Create display items: __empty__ row + actual items
-  const displayItems = ['__empty__', ...items];
+  const displayItems = useMemo(() => ['__empty__', ...items], [items]);
   
   // Focus index 0 = empty, so we want to start at index 1 (first real item) if items exist
   const initialFocusIndex = items.length > 0 ? 1 : 0;

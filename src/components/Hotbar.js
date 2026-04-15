@@ -1,5 +1,5 @@
 import styled from "styled-components";
-import { link, getItemTexture, TILE_SIZE } from "./util";
+import { link, getItemTexture } from "./util";
 
 const HotbarContainer = styled.div`
   display: flex;

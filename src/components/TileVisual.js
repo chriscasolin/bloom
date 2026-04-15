@@ -40,7 +40,7 @@ const WaterOverlay = styled.div`
   left: 0;
   width: 100%;
   height: 100%;
-  background-image: ${({ $waterBg2 }) => $waterBg2};
+  background-image: ${({ $waterOverlay }) => $waterOverlay};
   background-size: cover;
   background-position: 0 0;
   opacity: 0;
@@ -105,8 +105,7 @@ const TileVisual = ({
   const [timer, setTimer] = useState(null);
   const [background, setBackground] = useState(() => buildBackground(tileObj, adjacentTiles));
   const [isWater, setIsWater] = useState(false);
-  const [waterBg1, setWaterBg1] = useState(null);
-  const [waterBg2, setWaterBg2] = useState(null);
+  const [waterOverlay, setWaterOverlay] = useState(null);
   const [offsetBg, setOffsetBg] = useState(null);
   const prevTexturesRef = React.useRef(null);
 
@@ -132,11 +131,9 @@ const TileVisual = ({
       }
       
       if (hasWater && textures.length >= 2) {
-        setWaterBg1(link(textures[0]));
-        setWaterBg2(link(textures[1]));
+        setWaterOverlay(link(textures[1]));
       } else {
-        setWaterBg1(null);
-        setWaterBg2(null);
+        setWaterOverlay(null);
       }
       
       // Preload images and build background
@@ -176,7 +173,7 @@ const TileVisual = ({
     $y={tileObj.y}
   >
     {offsetBg && <GrassPlantOverlay $grassPlantBg={offsetBg} $offsetY={getOffsetY(tileObj.x, tileObj.y)} />}
-    {isWater && waterBg2 && <WaterOverlay $waterBg2={waterBg2} />}
+    {isWater && waterOverlay && <WaterOverlay $waterOverlay={waterOverlay} />}
     {(selected.x === tileObj.x && selected.y === tileObj.y) &&
       <SelectedIndicator>
         <BreakBar
