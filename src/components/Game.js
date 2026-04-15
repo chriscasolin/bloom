@@ -2,6 +2,7 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import MapWindow from "./MapWindow";
 import Player from "./Player";
 import DebugUI from "./DebugUI";
+import ControlsPanel from "./ControlsPanel";
 import { INITIAL_DIRECTION, MAX_TARGET_DISTANCE, PRELOAD_IMAGES, WATER_SPREADING_INTERVAL } from "./util";
 import Tile from "./tiles/Tile";
 import { getWorld, getBiomeAtPosition } from "./worldGenerator";
@@ -30,6 +31,7 @@ const Game = () => {
   const [droppedItems, setDroppedItems] = useState([]);
   const [currentWorld, setCurrentWorld] = useState('demo');
   const [biomeTiles, setBiomeTiles] = useState(null);
+  const [showControls, setShowControls] = useState(false);
   const waterEngineRef = useRef(new WaterEngine());
   const waterSpreadIntervalRef = useRef(null);
   const mapRef = useRef(null);
@@ -38,6 +40,21 @@ const Game = () => {
   useEffect(() => {
     mapRef.current = map;
   }, [map]);
+
+  // Handle keyboard shortcut for controls panel
+  useEffect(() => {
+    const handleKeyPress = (e) => {
+      if (e.key === '?') {
+        setShowControls(prev => !prev);
+      }
+      if (e.key === 'Escape') {
+        setShowControls(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
+  }, []);
 
   // Load world on mount
   useEffect(() => {
@@ -289,6 +306,7 @@ const Game = () => {
   return (
     <>
       <DebugUI position={playerState.position} biome={currentBiome} />
+      <ControlsPanel isOpen={showControls} onClose={() => setShowControls(false)} />
       <MapWindow
         map={map}
         position={playerState.position}
@@ -329,6 +347,24 @@ const Game = () => {
         gap: '10px',
         flexDirection: 'column'
       }}>
+        <button
+          onClick={() => setShowControls(!showControls)}
+          style={{
+            padding: '10px 15px',
+            backgroundColor: '#64b5f6',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            fontWeight: 'bold',
+            fontSize: '14px',
+            transition: 'background-color 0.2s'
+          }}
+          onMouseEnter={(e) => e.target.style.backgroundColor = '#42a5f5'}
+          onMouseLeave={(e) => e.target.style.backgroundColor = '#64b5f6'}
+        >
+          Controls
+        </button>
         <select
           defaultValue={currentWorld}
           onChange={(e) => {
