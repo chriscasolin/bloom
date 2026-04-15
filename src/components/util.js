@@ -22,10 +22,10 @@ export const InventoryKeybinds = {
   navigateDown: 'arrowdown',
   navigateLeft: 'arrowleft',
   navigateRight: 'arrowright',
-  
+
   // Selection
   select: ' ',
-  deselectCurrent: 'escape' 
+  deselectCurrent: 'escape'
 };
 
 export const TileName = {
@@ -127,7 +127,7 @@ export const playerDirectionAsset = (d) => {
 export const SOLID_OBJECTS = new Set([TileName.BARRIER, TileName.TREE, TileName.CACTUS, TileName.GRANITE])
 // export const SOLID_OBJECTS = new Set([TileName.BARRIER]) // empty for testing
 export const WATER_SPREADING_INTERVAL = 500; // ms between water spread ticks
-export const mapKey = (x, y) =>  `${Math.round(x)}_${Math.round(y)}`
+export const mapKey = (x, y) => `${Math.round(x)}_${Math.round(y)}`
 
 export const MOVEMENT_KEYS = new Set([KEY.NORTH, KEY.SOUTH, KEY.EAST, KEY.WEST]);
 
@@ -162,7 +162,7 @@ export const getTileDrops = (tileName) => {
       return [ItemName.DIRT];
     case TileName.GRASS_PLANT:
       // GrassPlant has 1/3 chance to drop wheat_seeds, otherwise drop nothing
-      return Math.random() < 1/3 ? [ItemName.WHEAT_SEEDS] : [];
+      return Math.random() < 1 / 3 ? [ItemName.WHEAT_SEEDS] : [];
     case TileName.SUNFLOWER:
       return [ItemName.SUNFLOWER];
     case TileName.DAFFODIL:
@@ -287,3 +287,14 @@ export const getPlacementResult = (itemType, tile) => {
 
   return null;
 };
+
+const publicUrl = process.env.PUBLIC_URL || '';
+export const PRELOAD_IMAGES = [
+  `${publicUrl}/textures/tiles/grass.png`,
+  `${publicUrl}/textures/tiles/stone.png`,
+  `${publicUrl}/textures/tiles/sand.png`,
+  `${publicUrl}/textures/tiles/water/1/0.png`,
+  `${publicUrl}/textures/tiles/water/2/0.png`,
+  `${publicUrl}/textures/player/idle.png`,
+  `${publicUrl}/textures/items/item_bg.png`
+];

@@ -2,7 +2,7 @@
   "name": "game_movement",
   "version": "0.1.0",
   "private": true,
-  "homepage": "https://chriscasolin.github.io/bloom",
+  "homepage": "./",
   "dependencies": {
     "@testing-library/dom": "^10.4.0",
     "@testing-library/jest-dom": "^6.6.3",

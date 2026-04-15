@@ -2,7 +2,7 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import MapWindow from "./MapWindow";
 import Player from "./Player";
 import DebugUI from "./DebugUI";
-import { INITIAL_DIRECTION, MAX_TARGET_DISTANCE, WATER_SPREADING_INTERVAL } from "./util";
+import { INITIAL_DIRECTION, MAX_TARGET_DISTANCE, PRELOAD_IMAGES, WATER_SPREADING_INTERVAL } from "./util";
 import Tile from "./tiles/Tile";
 import { getWorld, getBiomeAtPosition } from "./worldGenerator";
 import { WaterEngine } from "./waterEngine";
@@ -137,6 +137,14 @@ const Game = () => {
         waterEngine.reset();
       }
     };
+  }, []);
+
+  // Preload common textures on mount for better performance
+  useEffect(() => {
+    PRELOAD_IMAGES.forEach(src => {
+      const img = new Image();
+      img.src = src;
+    });
   }, []);
 
   const handlePlayerUpdate = useCallback((updates) => {
