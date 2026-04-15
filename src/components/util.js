@@ -1,4 +1,7 @@
-export const WORLD_FILE = '/worlds/demo.json'
+import { WORLD_PATHS, getItemTexturePath, PRELOAD_IMAGES } from '../assets/assetPaths';
+
+export const WORLD_FILE = WORLD_PATHS.DEMO;
+export { getItemTexturePath, PRELOAD_IMAGES };
 export const TILE_SIZE = 50; // px
 export const WINDOW_SIZE_X = 16;
 export const WINDOW_SIZE_Y = 12;
@@ -184,42 +187,7 @@ export const getTileDrops = (tileName) => {
  * Get the texture path for an item type
  */
 export const getItemTexture = (itemType) => {
-  switch (itemType) {
-    case '__empty__':
-      return 'hand.png';
-    case 'log':
-      return 'items/log_item.png';
-    case 'stick':
-      return 'items/stick_item.png';
-    case 'leaves':
-      return 'items/leaves_item.png';
-    case 'berries':
-      return 'items/berries_item.png';
-    case 'cactus':
-      return 'items/cactus_item.png';
-    case 'sand':
-      return 'items/sand_item.png';
-    case 'dirt':
-      return 'items/dirt_item.png';
-    case 'stone':
-      return 'items/stone_item.png';
-    case 'granite':
-      return 'items/granite_item.png';
-    case 'wheat_seeds':
-      return 'items/wheat_seeds.png';
-    case 'sunflower':
-      return 'items/sunflower_item.png';
-    case 'daffodil':
-      return 'items/daffodil_item.png';
-    case 'daisy':
-      return 'items/daisy_item.png';
-    case 'tree':
-      return 'tree_outlined.png';
-    case 'grass':
-      return 'grass.png';
-    default:
-      return 'missing.png';
-  }
+  return getItemTexturePath(itemType);
 };
 
 /**
@@ -287,14 +255,3 @@ export const getPlacementResult = (itemType, tile) => {
 
   return null;
 };
-
-const publicUrl = process.env.PUBLIC_URL || '';
-export const PRELOAD_IMAGES = [
-  `${publicUrl}/textures/tiles/grass.png`,
-  `${publicUrl}/textures/tiles/stone.png`,
-  `${publicUrl}/textures/tiles/sand.png`,
-  `${publicUrl}/textures/tiles/water/1/0.png`,
-  `${publicUrl}/textures/tiles/water/2/0.png`,
-  `${publicUrl}/textures/player/idle.png`,
-  `${publicUrl}/textures/items/item_bg.png`
-];
