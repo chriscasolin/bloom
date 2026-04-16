@@ -1,10 +1,8 @@
 #!/usr/bin/env node
 
-import { readdirSync, writeFileSync } from 'fs';
-import { join, extname, dirname } from 'path';
-import { fileURLToPath } from 'url';
+const { readdirSync, writeFileSync } = require('fs');
+const { join, extname } = require('path');
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
 const texturesDir = join(__dirname, '../public/textures');
 
 function getAllImages(dir, baseDir = '') {
