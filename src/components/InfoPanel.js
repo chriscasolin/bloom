@@ -104,18 +104,6 @@ const Content = styled.div`
   }
 `;
 
-const Footer = styled.div`
-  padding: 16px 20px;
-  border-top: 1px solid #4a4a4a;
-  text-align: center;
-  font-size: 12px;
-  color: #888888;
-
-  p {
-    margin: 0;
-  }
-`;
-
 const InfoPanel = ({ isOpen, onClose }) => {
   const contentRef = useRef(null);
 
