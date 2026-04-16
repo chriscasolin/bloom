@@ -1,4 +1,5 @@
 import styled from 'styled-components';
+import { useEffect, useRef } from 'react';
 import { KEY } from './util';
 
 const Overlay = styled.div`
@@ -7,6 +8,7 @@ const Overlay = styled.div`
   left: 0;
   right: 0;
   bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -132,6 +134,29 @@ const Key = styled.span`
 `;
 
 const ControlsPanel = ({ isOpen, onClose }) => {
+  const contentRef = useRef(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleArrowScroll = (e) => {
+      if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+        e.preventDefault();
+        if (contentRef.current) {
+          const scrollAmount = 400;
+          if (e.key === 'ArrowUp') {
+            contentRef.current.scrollTop -= scrollAmount;
+          } else {
+            contentRef.current.scrollTop += scrollAmount;
+          }
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleArrowScroll);
+    return () => window.removeEventListener('keydown', handleArrowScroll);
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   const controls = [
@@ -180,7 +205,7 @@ const ControlsPanel = ({ isOpen, onClose }) => {
           <CloseButton onClick={onClose}>✕</CloseButton>
         </Header>
         
-        <Content>
+        <Content ref={contentRef}>
           {controls.map((section, idx) => (
             <Category key={idx}>
               <h3>{section.category}</h3>

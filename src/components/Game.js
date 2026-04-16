@@ -337,6 +337,7 @@ const Game = () => {
         selected={playerState.selected}
         droppedItems={droppedItems}
         waterEngine={waterEngineRef.current}
+        showControls={showControls}
       />
       <div style={{
         position: 'fixed',
