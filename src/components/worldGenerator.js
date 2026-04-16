@@ -591,6 +591,28 @@ const placeBeaches = (tiles, biomeTiles, width, height, random) => {
 };
 
 /**
+ * Validates that all biomes exist in the world
+ * Returns true if world has at least one tile of each biome
+ */
+const validateAllBiomesExist = (biomeTiles) => {
+  const biomesFound = new Set();
+  
+  for (const biome of Object.values(biomeTiles)) {
+    biomesFound.add(biome);
+  }
+  
+  // Check if all 4 biomes are present
+  const requiredBiomes = Object.values(BiomeTypes);
+  for (const biome of requiredBiomes) {
+    if (!biomesFound.has(biome)) {
+      return false;
+    }
+  }
+  
+  return true;
+};
+
+/**
  * Finds a suitable spawn point using BFS from world center
  */
 const findSpawnPoint = (tiles, width, height) => {
@@ -634,22 +656,104 @@ const findSpawnPoint = (tiles, width, height) => {
 
 /**
  * Generates a large world with multiple biomes
+ * Regenerates if not all biomes are present in the world
  */
 export const generateBiomeWorld = (width, height, options = {}) => {
   const {
-    seed = Math.floor(Math.random() * 1000000),
     scale = 60,
     octaves = 4
   } = options;
 
-  const random = seed !== null ? seededRandom(seed) : Math.random;
+  const MAX_RETRIES = 20;
+  let attempt = 0;
+
+  while (attempt < MAX_RETRIES) {
+    const seed = Math.floor(Math.random() * 1000000);
+    const random = seededRandom(seed);
+    const tiles = {};
+    const biomeTiles = {};
+
+    // Generate noise maps for biome placement
+    const { noiseMap, secondaryNoiseMap, oceanNoiseMap } = generateNoiseMap(width, height, scale, seed, octaves);
+    
+    // Assign biomes to each tile and create base ground
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const key = mapKey(x, y);
+        const noiseValue = noiseMap[key];
+        const desertNoise = secondaryNoiseMap[key];
+        const oceanNoise = oceanNoiseMap[key];
+        const biomeType = getBiomeAtPoint(noiseValue, desertNoise, oceanNoise);
+        const biomeDef = BiomeDefinitions[biomeType];
+        
+        biomeTiles[key] = biomeType;
+        
+        // Create base ground tile
+        tiles[key] = {
+          ground: { type: biomeDef.groundType }
+        };
+        
+        // Add water if ocean biome
+        if (biomeType === BiomeTypes.OCEAN) {
+          tiles[key].water = true;
+        }
+      }
+    }
+
+    // Check if all biomes are present - if not, regenerate
+    if (!validateAllBiomesExist(biomeTiles)) {
+      attempt++;
+      continue;
+    }
+
+    // Place biome-specific features
+    placeFeatures(tiles, biomeTiles, width, height, random);
+
+    // Place lakes as additional water features
+    placeLakes(tiles, biomeTiles, width, height, random, 10);
+
+    // Place cute little islands in oceans with random chance
+    placeIslands(tiles, biomeTiles, width, height, random);
+
+    // Place natural beaches along ocean coastlines
+    placeBeaches(tiles, biomeTiles, width, height, random);
+
+    // Place granite overlays on stone deposits
+    placeGranite(tiles, width, height, random);
+
+    // Place borders
+    for (let x = 0; x < width; x++) {
+      for (let y = 0; y < height; y++) {
+        if (x === 0 || x === width - 1 || y === 0 || y === height - 1) {
+          const key = mapKey(x, y);
+          tiles[key] = {
+            ground: { type: TileName.GRASS },
+            object: { type: TileName.BARRIER }
+          };
+        }
+      }
+    }
+
+    // Find suitable spawn point
+    const spawnPos = findSpawnPoint(tiles, width, height);
+
+    return {
+      tiles,
+      biomeTiles,
+      size: { x: width, y: height },
+      position: spawnPos
+    };
+  }
+
+  // Fallback: return a world even if validation fails after max retries
+  console.warn(`Failed to generate world with all biomes after ${MAX_RETRIES} attempts. Returning partial world.`);
+  const seed = Math.floor(Math.random() * 1000000);
+  const random = seededRandom(seed);
   const tiles = {};
   const biomeTiles = {};
 
-  // Generate noise maps for biome placement
   const { noiseMap, secondaryNoiseMap, oceanNoiseMap } = generateNoiseMap(width, height, scale, seed, octaves);
   
-  // Assign biomes to each tile and create base ground
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
       const key = mapKey(x, y);
@@ -660,35 +764,22 @@ export const generateBiomeWorld = (width, height, options = {}) => {
       const biomeDef = BiomeDefinitions[biomeType];
       
       biomeTiles[key] = biomeType;
-      
-      // Create base ground tile
       tiles[key] = {
         ground: { type: biomeDef.groundType }
       };
       
-      // Add water if ocean biome
       if (biomeType === BiomeTypes.OCEAN) {
         tiles[key].water = true;
       }
     }
   }
 
-  // Place biome-specific features
   placeFeatures(tiles, biomeTiles, width, height, random);
-
-  // Place lakes as additional water features
   placeLakes(tiles, biomeTiles, width, height, random, 10);
-
-  // Place cute little islands in oceans with random chance
   placeIslands(tiles, biomeTiles, width, height, random);
-
-  // Place natural beaches along ocean coastlines
   placeBeaches(tiles, biomeTiles, width, height, random);
-
-  // Place granite overlays on stone deposits
   placeGranite(tiles, width, height, random);
 
-  // Place borders
   for (let x = 0; x < width; x++) {
     for (let y = 0; y < height; y++) {
       if (x === 0 || x === width - 1 || y === 0 || y === height - 1) {
@@ -701,7 +792,6 @@ export const generateBiomeWorld = (width, height, options = {}) => {
     }
   }
 
-  // Find suitable spawn point
   const spawnPos = findSpawnPoint(tiles, width, height);
 
   return {
