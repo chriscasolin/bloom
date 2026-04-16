@@ -288,13 +288,4 @@ export const getPlacementResult = (itemType, tile) => {
   return null;
 };
 
-const publicUrl = process.env.PUBLIC_URL || '';
-export const PRELOAD_IMAGES = [
-  `${publicUrl}/textures/tiles/grass.png`,
-  `${publicUrl}/textures/tiles/stone.png`,
-  `${publicUrl}/textures/tiles/sand.png`,
-  `${publicUrl}/textures/tiles/water/1/0.png`,
-  `${publicUrl}/textures/tiles/water/2/0.png`,
-  `${publicUrl}/textures/player/idle.png`,
-  `${publicUrl}/textures/items/item_bg.png`
-];
+export { PRELOAD_IMAGES } from './preloadTextures.js';
