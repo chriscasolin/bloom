@@ -23,7 +23,7 @@ const Player = ({
   targetDistance,
   selected,
   droppedItems,
-  showControls
+  disableInput
 }) => {
   const heldKeys = useRef(new Set());
   const positionRef = useRef(position);
@@ -422,7 +422,7 @@ const Player = ({
 
 
   const onKeyDown = useCallback((event) => {
-    if (showControls) return;
+    if (disableInput) return;
     
     const key = keyCode(event)
     if (heldKeys.current.has(key)) return;
@@ -450,10 +450,10 @@ const Player = ({
     } else if (!inventory.open && MOVEMENT_KEYS.has(key)) {
       onMovementKeyDown(key);
     }
-  }, [toggleInventory, loopTargetDistance, performAction, onSelectItem, inventory.open, onMovementKeyDown, showControls]);
+  }, [toggleInventory, loopTargetDistance, performAction, onSelectItem, inventory.open, onMovementKeyDown, disableInput]);
 
   const onKeyUp = useCallback((event) => {
-    if (showControls) return;
+    if (disableInput) return;
     
     const key = keyCode(event)
     if (!heldKeys.current.has(key)) return;
@@ -462,7 +462,7 @@ const Player = ({
     if (key === KEY.USE) {
       cancelBreak();
     } else if (MOVEMENT_KEYS.has(key)) onMovementKeyUp();
-  }, [cancelBreak, onMovementKeyUp, showControls]);
+  }, [cancelBreak, onMovementKeyUp, disableInput]);
 
   useEffect(() => {
     window.addEventListener("keydown", onKeyDown);

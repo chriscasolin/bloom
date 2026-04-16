@@ -3,6 +3,7 @@ import MapWindow from "./MapWindow";
 import Player from "./Player";
 import DebugUI from "./DebugUI";
 import ControlsPanel from "./ControlsPanel";
+import InfoPanel from "./InfoPanel";
 import { INITIAL_DIRECTION, MAX_TARGET_DISTANCE, PRELOAD_IMAGES, WATER_SPREADING_INTERVAL } from "./util";
 import Tile from "./tiles/Tile";
 import { getWorld, getBiomeAtPosition } from "./worldGenerator";
@@ -32,23 +33,33 @@ const Game = () => {
   const [currentWorld, setCurrentWorld] = useState('demo');
   const [biomeTiles, setBiomeTiles] = useState(null);
   const [showControls, setShowControls] = useState(false);
+  const [showInfo, setShowInfo] = useState(false);
   const waterEngineRef = useRef(new WaterEngine());
   const waterSpreadIntervalRef = useRef(null);
   const mapRef = useRef(null);
+
+  // Disable input when any modal is open
+  const disableInput = showControls || showInfo;
 
   // Keep map ref in sync
   useEffect(() => {
     mapRef.current = map;
   }, [map]);
 
-  // Handle keyboard shortcut for controls panel
+  // Handle keyboard shortcuts for modals
   useEffect(() => {
     const handleKeyPress = (e) => {
       if (e.key === '?') {
         setShowControls(prev => !prev);
+        setShowInfo(false);
+      }
+      if (e.key === 'i' || e.key === 'I') {
+        setShowInfo(prev => !prev);
+        setShowControls(false);
       }
       if (e.key === 'Escape') {
         setShowControls(false);
+        setShowInfo(false);
       }
     };
 
@@ -307,6 +318,7 @@ const Game = () => {
     <>
       <DebugUI position={playerState.position} biome={currentBiome} />
       <ControlsPanel isOpen={showControls} onClose={() => setShowControls(false)} />
+      <InfoPanel isOpen={showInfo} onClose={() => setShowInfo(false)} />
       <MapWindow
         map={map}
         position={playerState.position}
@@ -337,7 +349,7 @@ const Game = () => {
         selected={playerState.selected}
         droppedItems={droppedItems}
         waterEngine={waterEngineRef.current}
-        showControls={showControls}
+        disableInput={disableInput}
       />
       <div style={{
         position: 'fixed',
@@ -349,7 +361,10 @@ const Game = () => {
         flexDirection: 'column'
       }}>
         <button
-          onClick={() => setShowControls(!showControls)}
+          onClick={() => {
+            setShowControls(!showControls);
+            setShowInfo(false);
+          }}
           style={{
             padding: '10px 15px',
             backgroundColor: '#64b5f6',
@@ -365,6 +380,27 @@ const Game = () => {
           onMouseLeave={(e) => e.target.style.backgroundColor = '#64b5f6'}
         >
           Controls
+        </button>
+        <button
+          onClick={() => {
+            setShowInfo(!showInfo);
+            setShowControls(false);
+          }}
+          style={{
+            padding: '10px 15px',
+            backgroundColor: '#64b5f6',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            fontWeight: 'bold',
+            fontSize: '14px',
+            transition: 'background-color 0.2s'
+          }}
+          onMouseEnter={(e) => e.target.style.backgroundColor = '#42a5f5'}
+          onMouseLeave={(e) => e.target.style.backgroundColor = '#64b5f6'}
+        >
+          Info
         </button>
         <select
           defaultValue={currentWorld}
@@ -384,6 +420,18 @@ const Game = () => {
           <option value="random">Random World</option>
           <option value="demo">Demo World</option>
         </select>
+      </div>
+      <div style={{
+        position: 'fixed',
+        bottom: '10px',
+        left: '0',
+        right: '0',
+        textAlign: 'center',
+        fontSize: '12px',
+        color: '#888888',
+        pointerEvents: 'none'
+      }}>
+        If you experience performance issues, try switching to a different browser. I'm working out some problems with Chrome. Safari works well for me.
       </div>
     </>
   );

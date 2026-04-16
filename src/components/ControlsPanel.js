@@ -177,7 +177,7 @@ const ControlsPanel = ({ isOpen, onClose }) => {
         { action: 'Use / Break', key: 'SPACE' },
         { action: 'Interact', key: KEY.INTERACT.toUpperCase() },
         { action: 'Open Inventory', key: KEY.INVENTORY.toUpperCase() },
-        { action: 'Toggle Target Distance', key: KEY.TARGET_DISTANCE.toUpperCase() },
+        { action: 'Change Target Distance', key: KEY.TARGET_DISTANCE.toUpperCase() },
       ]
     },
     {
@@ -190,9 +190,10 @@ const ControlsPanel = ({ isOpen, onClose }) => {
       ]
     },
     {
-      category: 'Control Menu',
+      category: 'Menus',
       items: [
-        { action: 'Open / Close', key: '?' },
+        { action: 'Help', key: '?' },
+        { action: 'Info', key: 'i' },
       ]
     }
   ];
